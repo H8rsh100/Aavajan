@@ -1,7 +1,7 @@
 from pathlib import Path
 from PIL import Image
 
-SOURCE = Path("Screenshot 2026-09-25 140449.png")
+SOURCE = Path("Ganesha.png")
 TARGET = Path("src/shape_mask.txt")
 WIDTH = 60
 HEIGHT = 84

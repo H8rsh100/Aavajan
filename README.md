@@ -65,7 +65,7 @@ cargo run --release -- --benchmark --frames 600
 
 ## Regenerate the artwork mask
 
-The source artwork is `Screenshot 2026-09-25 140449.png`. The runtime uses the generated mask, while the optional Python helper makes the transformation reproducible:
+The source artwork is `Ganesha.png`. The runtime uses the generated mask, while the optional Python helper makes the transformation reproducible:
 
 ```text
 python -m pip install pillow

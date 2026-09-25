@@ -24,7 +24,7 @@ The first command prints a formed snapshot without ANSI control codes. The secon
 
 ## Artwork changes
 
-The source image is `Screenshot 2026-09-25 140449.png`. If the artwork changes, regenerate the compact mask with:
+The source image is `Ganesha.png`. If the artwork changes, regenerate the compact mask with:
 
 ```text
 python -m pip install pillow
