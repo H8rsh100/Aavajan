@@ -12,8 +12,10 @@ use braille::{Framebuffer, Rgb};
 
 const CYCLE_SECONDS: f32 = 12.0;
 const FORM_END: f32 = 4.0;
-const HOLD_END: f32 = 7.0;
-const DISSOLVE_END: f32 = 11.5;
+const HOLD_DURATION: f32 = 3.5;
+const DISSOLVE_DURATION: f32 = 2.0;
+const HOLD_END: f32 = FORM_END + HOLD_DURATION;
+const DISSOLVE_END: f32 = HOLD_END + DISSOLVE_DURATION;
 const TAU: f32 = std::f32::consts::PI * 2.0;
 const DEFAULT_SEED: u32 = 0x0A17_AA93;
 
@@ -368,4 +370,16 @@ fn lerp(from: f32, to: f32, amount: f32) -> f32 {
 fn ease(value: f32) -> f32 {
     let value = value.clamp(0.0, 1.0);
     1.0 - (1.0 - value).powi(3)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn phase_timing_matches_the_animation_contract() {
+        assert_eq!(HOLD_END - FORM_END, 3.5);
+        assert_eq!(DISSOLVE_END - HOLD_END, 2.0);
+        assert_eq!(CYCLE_SECONDS - DISSOLVE_END, 2.5);
+    }
 }

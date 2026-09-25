@@ -4,10 +4,10 @@ Aavajan is a compact Rust terminal art experiment that turns a stylized Ganesha 
 
 The animation follows a twelve-second loop:
 
-1. **Aavahan** - particles arrive from the surrounding field.
-2. **Formation** - the particles assemble into the artwork.
-3. **Dharma** - the formed Ganesha holds with a gentle living shimmer.
-4. **Visarjan** - the particles disperse into colored trails.
+1. **Aavahan and formation** - particles arrive and assemble for 4 seconds.
+2. **Dharma** - the formed Ganesha holds with a gentle living shimmer for 3.5 seconds.
+3. **Visarjan** - the particles disperse into colored trails for 2 seconds.
+4. **Reset tail** - the field rests for the remaining 2.5 seconds.
 
 ## The name
 
