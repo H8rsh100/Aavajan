@@ -37,14 +37,30 @@ struct Particle {
     drift: f32,
 }
 
+struct Options {
+    frame_limit: Option<u32>,
+    help: bool,
+}
+
 fn main() {
-    if let Err(error) = run() {
+    let options = match parse_options() {
+        Ok(options) => options,
+        Err(message) => {
+            eprintln!("aavajan: {message}");
+            std::process::exit(2);
+        }
+    };
+    if options.help {
+        print_help();
+        return;
+    }
+    if let Err(error) = run(options.frame_limit) {
         eprintln!("aavajan: {error}");
         std::process::exit(1);
     }
 }
 
-fn run() -> io::Result<()> {
+fn run(frame_limit: Option<u32>) -> io::Result<()> {
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(
@@ -58,7 +74,13 @@ fn run() -> io::Result<()> {
     let mut framebuffer = Framebuffer::new(columns.clamp(40, 160), rows.clamp(12, 60));
     let mut particles = create_particles();
     let started = Instant::now();
-    let result = run_loop(&mut stdout, &mut framebuffer, &mut particles, started);
+    let result = run_loop(
+        &mut stdout,
+        &mut framebuffer,
+        &mut particles,
+        started,
+        frame_limit,
+    );
 
     terminal::disable_raw_mode()?;
     execute!(
@@ -75,7 +97,9 @@ fn run_loop<W: Write>(
     framebuffer: &mut Framebuffer,
     particles: &mut [Particle],
     started: Instant,
+    frame_limit: Option<u32>,
 ) -> io::Result<()> {
+    let mut frame = 0u32;
     loop {
         if event::poll(Duration::from_millis(0))?
             && let Event::Key(key) = event::read()?
@@ -91,6 +115,10 @@ fn run_loop<W: Write>(
         let elapsed = started.elapsed().as_secs_f32();
         render(framebuffer, particles, elapsed);
         framebuffer.present(output)?;
+        frame += 1;
+        if frame_limit.is_some_and(|limit| frame >= limit) {
+            return Ok(());
+        }
 
         let frame_time = frame_started.elapsed();
         let target = Duration::from_secs_f64(1.0 / 60.0);
@@ -98,6 +126,40 @@ fn run_loop<W: Write>(
             thread::sleep(target - frame_time);
         }
     }
+}
+
+fn parse_options() -> Result<Options, String> {
+    let mut options = Options {
+        frame_limit: None,
+        help: false,
+    };
+    let mut arguments = std::env::args().skip(1);
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--help" | "-h" => options.help = true,
+            "--frames" => {
+                let value = arguments
+                    .next()
+                    .ok_or_else(|| "--frames needs a positive number".to_string())?;
+                options.frame_limit = Some(
+                    value
+                        .parse::<u32>()
+                        .ok()
+                        .filter(|limit| *limit > 0)
+                        .ok_or_else(|| "--frames needs a positive number".to_string())?,
+                );
+            }
+            _ => return Err(format!("unknown option: {argument}")),
+        }
+    }
+    Ok(options)
+}
+
+fn print_help() {
+    println!("Aavajan - Ganesha Particle Renderer");
+    println!("Usage: aavajan [--frames COUNT]");
+    println!("  --frames COUNT  stop after COUNT rendered frames");
+    println!("  -h, --help      show this help");
 }
 
 fn create_particles() -> Vec<Particle> {
