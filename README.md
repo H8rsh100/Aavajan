@@ -87,3 +87,11 @@ cargo clippy -- -D warnings
 ## Recording
 
 A VHS tape is provided in `vhs/demo.tape`. It records a complete twelve-second cycle at the compact terminal size. The generated GIF is ignored by Git so the repository stays focused on source and reproducible instructions.
+
+For an asciinema cast on Windows, install asciinema and run:
+
+```text
+powershell -ExecutionPolicy Bypass -File scripts/record-asciinema.ps1
+```
+
+The helper accepts `-Frames`, `-Seed`, and `-Output` parameters and writes a local `.cast` file, which is also ignored by Git.
