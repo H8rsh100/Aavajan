@@ -1,0 +1,9 @@
+[package]
+name = "aavajan"
+version = "0.1.0"
+edition = "2024"
+description = "Aavajan - Ganesha Particle Renderer"
+license = "MIT"
+
+[dependencies]
+crossterm = "0.29"

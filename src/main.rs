@@ -1,0 +1,218 @@
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::terminal::{self, ClearType};
+use crossterm::{cursor, execute};
+use std::io::{self, Write};
+use std::thread;
+use std::time::{Duration, Instant};
+
+mod braille;
+mod shape;
+
+use braille::{Framebuffer, Rgb};
+
+const CYCLE_SECONDS: f32 = 12.0;
+const FORM_END: f32 = 4.0;
+const HOLD_END: f32 = 7.0;
+const DISSOLVE_END: f32 = 11.5;
+const TAU: f32 = std::f32::consts::PI * 2.0;
+
+const SAFFRON: Rgb = Rgb::new(1.0, 0.42, 0.06);
+const GOLD: Rgb = Rgb::new(1.0, 0.78, 0.18);
+const CRIMSON: Rgb = Rgb::new(0.72, 0.04, 0.08);
+const INDIGO: Rgb = Rgb::new(0.22, 0.16, 0.58);
+
+#[derive(Clone, Copy, Default)]
+struct Point {
+    x: f32,
+    y: f32,
+}
+
+struct Particle {
+    start: Point,
+    target: Point,
+    position: Point,
+    previous: Point,
+    color: Rgb,
+    phase: f32,
+    drift: f32,
+}
+
+fn main() {
+    if let Err(error) = run() {
+        eprintln!("aavajan: {error}");
+        std::process::exit(1);
+    }
+}
+
+fn run() -> io::Result<()> {
+    terminal::enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(
+        stdout,
+        terminal::EnterAlternateScreen,
+        cursor::Hide,
+        terminal::Clear(ClearType::All)
+    )?;
+
+    let (columns, rows) = terminal::size().unwrap_or((80, 24));
+    let mut framebuffer = Framebuffer::new(columns.clamp(40, 160), rows.clamp(12, 60));
+    let mut particles = create_particles();
+    let started = Instant::now();
+    let result = run_loop(&mut stdout, &mut framebuffer, &mut particles, started);
+
+    terminal::disable_raw_mode()?;
+    execute!(
+        stdout,
+        cursor::Show,
+        terminal::LeaveAlternateScreen,
+        terminal::Clear(ClearType::All)
+    )?;
+    result
+}
+
+fn run_loop<W: Write>(
+    output: &mut W,
+    framebuffer: &mut Framebuffer,
+    particles: &mut [Particle],
+    started: Instant,
+) -> io::Result<()> {
+    loop {
+        if event::poll(Duration::from_millis(0))?
+            && let Event::Key(key) = event::read()?
+            && (key.code == KeyCode::Esc
+                || key.code == KeyCode::Char('q')
+                || (key.code == KeyCode::Char('c')
+                    && key.modifiers.contains(KeyModifiers::CONTROL)))
+        {
+            return Ok(());
+        }
+
+        let frame_started = Instant::now();
+        let elapsed = started.elapsed().as_secs_f32();
+        render(framebuffer, particles, elapsed);
+        framebuffer.present(output)?;
+
+        let frame_time = frame_started.elapsed();
+        let target = Duration::from_secs_f64(1.0 / 60.0);
+        if frame_time < target {
+            thread::sleep(target - frame_time);
+        }
+    }
+}
+
+fn create_particles() -> Vec<Particle> {
+    let targets = shape::targets();
+    let mut seed = 0x0A17_AA93_u32;
+    let mut particles = Vec::with_capacity(targets.len());
+    for target in targets {
+        let angle = random(&mut seed) * TAU;
+        let radius = 0.35 + random(&mut seed) * 0.8;
+        let start = Point {
+            x: 0.5 + angle.cos() * radius * 1.25,
+            y: 0.48 + angle.sin() * radius * 0.72,
+        };
+        let color = if target.y < 0.32 {
+            GOLD
+        } else if target.x < 0.32 {
+            SAFFRON
+        } else if target.y > 0.68 {
+            CRIMSON
+        } else {
+            INDIGO
+        };
+        particles.push(Particle {
+            start,
+            target: Point {
+                x: target.x,
+                y: target.y,
+            },
+            position: start,
+            previous: start,
+            color,
+            phase: random(&mut seed) * TAU,
+            drift: 0.4 + random(&mut seed) * 0.8,
+        });
+    }
+    particles
+}
+
+fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f32) {
+    framebuffer.clear();
+    let cycle = elapsed % CYCLE_SECONDS;
+
+    for particle in particles {
+        particle.previous = particle.position;
+        let energy;
+        let radius = 1;
+
+        if cycle < FORM_END {
+            let progress = ease(cycle / FORM_END);
+            let remaining = 1.0 - progress;
+            particle.position.x = lerp(particle.start.x, particle.target.x, progress)
+                + (remaining * 0.045 * (particle.phase + cycle * 4.0).sin()).sin();
+            particle.position.y = lerp(particle.start.y, particle.target.y, progress)
+                + (remaining * 0.028 * (particle.phase * 1.7 + cycle * 5.0).cos()).sin();
+            energy = 0.35 + progress * 0.55;
+        } else if cycle < HOLD_END {
+            let local = cycle - FORM_END;
+            particle.position.x =
+                particle.target.x + (local * 1.7 + particle.phase).sin() * 0.006 * particle.drift;
+            particle.position.y = particle.target.y
+                + (local * 2.1 + particle.phase * 1.4).cos() * 0.008 * particle.drift;
+            energy = 0.9;
+        } else if cycle < DISSOLVE_END {
+            let progress = ease((cycle - HOLD_END) / (DISSOLVE_END - HOLD_END));
+            let direction_x = particle.target.x - 0.5;
+            let direction_y = particle.target.y - 0.48;
+            let length = (direction_x * direction_x + direction_y * direction_y)
+                .sqrt()
+                .max(0.001);
+            let distance = 0.08 + progress * 0.95;
+            let swirl = (progress * std::f32::consts::PI + particle.phase).sin() * 0.12;
+            particle.position.x =
+                particle.target.x + direction_x / length * distance - direction_y / length * swirl;
+            particle.position.y = particle.target.y
+                + direction_y / length * distance
+                + direction_x / length * swirl
+                + (progress * 8.0 + particle.phase).sin() * 0.025;
+            energy = 0.9 * (1.0 - progress * 0.72);
+        } else {
+            let progress = (cycle - DISSOLVE_END) / (CYCLE_SECONDS - DISSOLVE_END);
+            particle.position.x = particle.target.x + direction(particle).0 * progress * 1.4;
+            particle.position.y = particle.target.y + direction(particle).1 * progress * 1.4;
+            energy = 0.2 * (1.0 - progress);
+        }
+
+        framebuffer.segment_normalized(
+            (particle.previous.x, particle.previous.y),
+            (particle.position.x, particle.position.y),
+            particle.color,
+            energy,
+            radius,
+        );
+        if (FORM_END..HOLD_END).contains(&cycle) {
+            framebuffer.plot_normalized(particle.position.x, particle.position.y, GOLD, 0.65, 1);
+        }
+    }
+}
+
+fn direction(particle: &Particle) -> (f32, f32) {
+    let x = particle.target.x - 0.5;
+    let y = particle.target.y - 0.48;
+    let length = (x * x + y * y).sqrt().max(0.001);
+    (x / length, y / length)
+}
+
+fn random(seed: &mut u32) -> f32 {
+    *seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+    (*seed >> 8) as f32 / 16_777_216.0
+}
+
+fn lerp(from: f32, to: f32, amount: f32) -> f32 {
+    from + (to - from) * amount
+}
+
+fn ease(value: f32) -> f32 {
+    let value = value.clamp(0.0, 1.0);
+    1.0 - (1.0 - value).powi(3)
+}
