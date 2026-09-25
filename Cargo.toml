@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 description = "Aavajan - Ganesha Particle Renderer"
 license = "MIT"
+readme = "README.md"
+repository = "https://github.com/H8rsh100/Aavajan"
+keywords = ["terminal", "braille", "particles", "generative-art", "ansi"]
+categories = ["command-line-utilities", "multimedia::graphics"]
 
 [dependencies]
 crossterm = "0.29"
