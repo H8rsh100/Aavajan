@@ -11,7 +11,7 @@ mod shape;
 use braille::{Framebuffer, Rgb};
 
 const FORM_END: f32 = 4.0;
-const HOLD_DURATION: f32 = 5.0;
+const HOLD_DURATION: f32 = 3.0;
 const DISSOLVE_DURATION: f32 = 2.0;
 const HOLD_END: f32 = FORM_END + HOLD_DURATION;
 const DISSOLVE_END: f32 = HOLD_END + DISSOLVE_DURATION;
@@ -23,6 +23,7 @@ const SAFFRON: Rgb = Rgb::new(1.0, 0.42, 0.06);
 const GOLD: Rgb = Rgb::new(1.0, 0.78, 0.18);
 const CRIMSON: Rgb = Rgb::new(0.72, 0.04, 0.08);
 const INDIGO: Rgb = Rgb::new(0.22, 0.16, 0.58);
+const WATER: Rgb = Rgb::new(0.12, 0.48, 0.78);
 
 #[derive(Clone, Copy, Default)]
 struct Point {
@@ -298,6 +299,7 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
         particle.previous = particle.position;
         let energy;
         let mut radius = 1;
+        let mut color = particle.color;
 
         if cycle < FORM_END {
             let progress = ease(cycle / FORM_END);
@@ -317,29 +319,22 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
             energy = 0.82 + pulse * 0.16;
             radius = 1;
         } else {
-            let progress = ease((cycle - HOLD_END) / DISSOLVE_DURATION);
-            let burst = ((progress - 0.65) / 0.35).clamp(0.0, 1.0);
-            let direction_x = particle.target.x - 0.5;
-            let direction_y = particle.target.y - 0.48;
-            let length = (direction_x * direction_x + direction_y * direction_y)
-                .sqrt()
-                .max(0.001);
-            let distance = 0.08 + progress * (1.1 + burst * 0.8);
-            let swirl = (progress * std::f32::consts::PI + particle.phase).sin() * 0.12;
+            let progress = ((cycle - HOLD_END) / DISSOLVE_DURATION).clamp(0.0, 1.0);
+            let ripple = (progress * 10.0 + particle.phase).sin() * 0.025 * progress;
             particle.position.x =
-                particle.target.x + direction_x / length * distance - direction_y / length * swirl;
+                particle.target.x + particle.phase.sin() * 0.018 * progress + ripple;
             particle.position.y = particle.target.y
-                + direction_y / length * distance
-                + direction_x / length * swirl
-                + (progress * 8.0 + particle.phase).sin() * 0.025;
-            energy = 0.9 * (1.0 - progress * 0.35) + burst * 0.4;
-            radius = if burst > 0.5 { 1 } else { 0 };
+                + progress * 0.62
+                + (progress * 5.0 + particle.phase).cos() * 0.012 * progress;
+            color = blend_color(particle.color, WATER, progress * 0.85);
+            energy = (1.0 - progress).powf(1.25) * 0.9;
+            radius = if progress < 0.7 { 1 } else { 0 };
         }
 
         framebuffer.segment_normalized(
             (particle.previous.x, particle.previous.y),
             (particle.position.x, particle.position.y),
-            particle.color,
+            color,
             energy,
             radius,
         );
@@ -358,6 +353,15 @@ fn lerp(from: f32, to: f32, amount: f32) -> f32 {
     from + (to - from) * amount
 }
 
+fn blend_color(from: Rgb, to: Rgb, amount: f32) -> Rgb {
+    let amount = amount.clamp(0.0, 1.0);
+    Rgb::new(
+        lerp(from.r, to.r, amount),
+        lerp(from.g, to.g, amount),
+        lerp(from.b, to.b, amount),
+    )
+}
+
 fn ease(value: f32) -> f32 {
     let value = value.clamp(0.0, 1.0);
     1.0 - (1.0 - value).powi(3)
@@ -369,7 +373,7 @@ mod tests {
 
     #[test]
     fn phase_timing_matches_the_animation_contract() {
-        assert_eq!(HOLD_END - FORM_END, 5.0);
+        assert_eq!(HOLD_END - FORM_END, 3.0);
         assert_eq!(DISSOLVE_END - HOLD_END, 2.0);
         assert_eq!(CYCLE_SECONDS, DISSOLVE_END);
     }
@@ -398,7 +402,7 @@ mod tests {
         render(
             &mut framebuffer,
             std::slice::from_mut(&mut particle),
-            FORM_END + 3.5,
+            FORM_END + 2.5,
         );
 
         assert_eq!(first_hold_position.x, target.x);
@@ -434,5 +438,39 @@ mod tests {
             .count();
 
         assert!(marked_cells >= 5);
+    }
+
+    #[test]
+    fn dissolve_sags_downward_without_a_radial_burst() {
+        let mut framebuffer = Framebuffer::new(10, 5);
+        let start = Point { x: 0.1, y: 0.2 };
+        let target = Point { x: 0.5, y: 0.4 };
+        let mut particle = Particle {
+            start,
+            target,
+            position: target,
+            previous: target,
+            color: CRIMSON,
+            phase: 1.2,
+            drift: 0.8,
+        };
+
+        render(
+            &mut framebuffer,
+            std::slice::from_mut(&mut particle),
+            HOLD_END + 1.0,
+        );
+        let middle = particle.position;
+        assert!(middle.y > target.y);
+        assert!((middle.x - target.x).abs() < 0.1);
+
+        render(
+            &mut framebuffer,
+            std::slice::from_mut(&mut particle),
+            DISSOLVE_END - 0.001,
+        );
+        assert!(particle.position.y > middle.y);
+        assert!((particle.position.x - target.x).abs() < 0.1);
+        assert_eq!(blend_color(CRIMSON, WATER, 1.0).b, WATER.b);
     }
 }

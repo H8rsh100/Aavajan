@@ -27,7 +27,7 @@ Owns the particle lifecycle:
 - Aavahan: move from randomized arrival points toward the mask.
 - Formation: ease each particle into its target position.
 - Dharma: hold the silhouette with low-amplitude drift.
-- Visarjan: move outward with a small tangential swirl and fade.
+- Visarjan: sag downward with small ripples, cool toward water blue, and fade to zero.
 
 The CLI modes share the same renderer. `--plain` removes terminal control codes, `--frames` bounds a run, `--seed` makes a recording reproducible, and `--benchmark` measures the render path without drawing to the terminal.
 

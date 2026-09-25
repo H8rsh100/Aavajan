@@ -2,11 +2,11 @@
 
 Aavajan is a compact Rust terminal art experiment that turns a stylized Ganesha silhouette into a field of glowing Braille particles. The image is rendered with 24-bit ANSI color and a small 2x4 sub-pixel framebuffer, so the animation stays sharp even in a normal terminal.
 
-The animation follows an eleven-second loop:
+The animation follows a nine-second loop:
 
 1. **Aavahan and formation** - particles arrive and assemble for 4 seconds.
-2. **Dharma** - the formed Ganesha holds with a gentle living shimmer for 5 seconds.
-3. **Visarjan** - the particles disperse and burst outward for 2 seconds, then the next cycle begins immediately.
+2. **Dharma** - the formed Ganesha holds with a gentle living shimmer for 3 seconds.
+3. **Visarjan** - particles sag downward, trail, cool toward blue, and dissolve like water over 2 seconds, then the next cycle begins immediately.
 
 ## The name
 
@@ -31,10 +31,10 @@ Controls:
 For a bounded recording or smoke test, render a fixed number of frames:
 
 ```text
-cargo run --release -- --frames 660
+cargo run --release -- --frames 540
 ```
 
-At 60 frames per second, 660 frames gives one complete animation cycle. The renderer automatically caps the terminal dimensions to a comfortable range and defaults to an 80x24-sized presentation when the terminal reports its size.
+At 60 frames per second, 540 frames gives one complete animation cycle. The renderer automatically caps the terminal dimensions to a comfortable range and defaults to an 80x24-sized presentation when the terminal reports its size.
 
 For a plain formed snapshot without terminal control codes:
 
@@ -45,7 +45,7 @@ cargo run --release -- --plain
 For reproducible recordings, provide any unsigned 32-bit seed. The default seed is used when this option is omitted.
 
 ```text
-cargo run --release -- --frames 660 --seed 1337
+cargo run --release -- --frames 540 --seed 1337
 ```
 
 Use `cargo run --release -- --version` to print the package version.
@@ -85,7 +85,7 @@ cargo clippy -- -D warnings
 
 ## Recording
 
-A VHS tape is provided in `vhs/demo.tape`. It records a complete eleven-second cycle at the compact terminal size. The generated GIF is ignored by Git so the repository stays focused on source and reproducible instructions.
+A VHS tape is provided in `vhs/demo.tape`. It records a complete nine-second cycle at the compact terminal size. The generated GIF is ignored by Git so the repository stays focused on source and reproducible instructions.
 
 For an asciinema cast on Windows, install asciinema and run:
 
