@@ -130,43 +130,66 @@ impl Framebuffer {
         }
     }
 
+    pub fn plain_frame(&self) -> String {
+        let mut output = String::with_capacity(self.cols as usize * self.rows as usize * 2);
+        for row in 0..self.rows as usize {
+            for col in 0..self.cols as usize {
+                if let Some((glyph, _)) = self.cell(col, row) {
+                    output.push(glyph);
+                } else {
+                    output.push(' ');
+                }
+            }
+            output.push('\n');
+        }
+        output
+    }
+
     fn frame(&self) -> String {
         let mut output = String::with_capacity(self.cols as usize * self.rows as usize * 24);
         for row in 0..self.rows as usize {
             let _ = write!(&mut output, "\x1b[{};1H", row + 1);
             for col in 0..self.cols as usize {
-                let mut dots = 0u8;
-                let mut light = 0.0;
-                let mut red = 0.0;
-                let mut green = 0.0;
-                let mut blue = 0.0;
-                for (dot, (offset_x, offset_y)) in DOT_OFFSETS.iter().enumerate() {
-                    let pixel_x = col * 2 + offset_x;
-                    let pixel_y = row * 4 + offset_y;
-                    let pixel = self.pixels[pixel_y * self.width + pixel_x];
-                    let threshold = 0.055 + BAYER[(pixel_x + pixel_y) % BAYER.len()] / 16.0 * 0.24;
-                    if pixel.light > threshold {
-                        dots |= 1 << dot;
-                        light += pixel.light;
-                        red += pixel.r;
-                        green += pixel.g;
-                        blue += pixel.b;
-                    }
-                }
-                if dots == 0 {
+                let Some((glyph, color)) = self.cell(col, row) else {
                     output.push(' ');
                     continue;
-                }
-                let scale = 255.0 / light.max(0.001);
-                let red = (red * scale).round().clamp(0.0, 255.0) as u8;
-                let green = (green * scale).round().clamp(0.0, 255.0) as u8;
-                let blue = (blue * scale).round().clamp(0.0, 255.0) as u8;
-                let glyph = char::from_u32(0x2800 + dots as u32).unwrap_or(' ');
+                };
+                let red = (color.r * 255.0).round().clamp(0.0, 255.0) as u8;
+                let green = (color.g * 255.0).round().clamp(0.0, 255.0) as u8;
+                let blue = (color.b * 255.0).round().clamp(0.0, 255.0) as u8;
                 let _ = write!(&mut output, "\x1b[38;2;{red};{green};{blue}m{glyph}");
             }
             output.push_str("\x1b[0m\x1b[K");
         }
         output
+    }
+
+    fn cell(&self, col: usize, row: usize) -> Option<(char, Rgb)> {
+        let mut dots = 0u8;
+        let mut light = 0.0;
+        let mut red = 0.0;
+        let mut green = 0.0;
+        let mut blue = 0.0;
+        for (dot, (offset_x, offset_y)) in DOT_OFFSETS.iter().enumerate() {
+            let pixel_x = col * 2 + offset_x;
+            let pixel_y = row * 4 + offset_y;
+            let pixel = self.pixels[pixel_y * self.width + pixel_x];
+            let threshold = 0.055 + BAYER[(pixel_x + pixel_y) % BAYER.len()] / 16.0 * 0.24;
+            if pixel.light > threshold {
+                dots |= 1 << dot;
+                light += pixel.light;
+                red += pixel.r;
+                green += pixel.g;
+                blue += pixel.b;
+            }
+        }
+        if dots == 0 {
+            return None;
+        }
+        let scale = 1.0 / light.max(0.001);
+        let color = Rgb::new(red * scale, green * scale, blue * scale);
+        let glyph = char::from_u32(0x2800 + dots as u32).unwrap_or(' ');
+        Some((glyph, color))
     }
 }
 
@@ -188,6 +211,16 @@ mod tests {
         let frame = framebuffer.frame();
         assert!(contains_braille(&frame));
         assert!(frame.contains("\x1b[38;2;"));
+    }
+
+    #[test]
+    fn plain_frame_contains_no_ansi() {
+        let mut framebuffer = Framebuffer::new(2, 1);
+        framebuffer.plot_normalized(0.25, 0.5, GOLD, 1.0, 0);
+
+        let frame = framebuffer.plain_frame();
+        assert!(contains_braille(&frame));
+        assert!(!frame.contains("\x1b"));
     }
 
     #[test]

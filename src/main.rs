@@ -39,6 +39,7 @@ struct Particle {
 
 struct Options {
     frame_limit: Option<u32>,
+    plain: bool,
     help: bool,
 }
 
@@ -54,7 +55,12 @@ fn main() {
         print_help();
         return;
     }
-    if let Err(error) = run(options.frame_limit) {
+    let result = if options.plain {
+        run_plain(options.frame_limit)
+    } else {
+        run(options.frame_limit)
+    };
+    if let Err(error) = result {
         eprintln!("aavajan: {error}");
         std::process::exit(1);
     }
@@ -90,6 +96,37 @@ fn run(frame_limit: Option<u32>) -> io::Result<()> {
         terminal::Clear(ClearType::All)
     )?;
     result
+}
+
+fn run_plain(frame_limit: Option<u32>) -> io::Result<()> {
+    let (columns, rows) = terminal::size().unwrap_or((80, 24));
+    let mut framebuffer = Framebuffer::new(columns.clamp(40, 160), rows.clamp(12, 60));
+    let mut particles = create_particles();
+    let frame_count = frame_limit.unwrap_or(1);
+    let start = if frame_limit.is_some() {
+        0.0
+    } else {
+        HOLD_END + 0.5
+    };
+    if frame_limit.is_none() {
+        for particle in &mut particles {
+            particle.position = particle.target;
+            particle.previous = particle.target;
+        }
+    }
+    let mut output = io::stdout();
+    for frame in 0..frame_count {
+        if frame > 0 {
+            output.write_all(b"\n")?;
+        }
+        render(
+            &mut framebuffer,
+            &mut particles,
+            start + frame as f32 / 60.0,
+        );
+        output.write_all(framebuffer.plain_frame().as_bytes())?;
+    }
+    Ok(())
 }
 
 fn run_loop<W: Write>(
@@ -131,12 +168,14 @@ fn run_loop<W: Write>(
 fn parse_options() -> Result<Options, String> {
     let mut options = Options {
         frame_limit: None,
+        plain: false,
         help: false,
     };
     let mut arguments = std::env::args().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--help" | "-h" => options.help = true,
+            "--plain" => options.plain = true,
             "--frames" => {
                 let value = arguments
                     .next()
@@ -157,7 +196,8 @@ fn parse_options() -> Result<Options, String> {
 
 fn print_help() {
     println!("Aavajan - Ganesha Particle Renderer");
-    println!("Usage: aavajan [--frames COUNT]");
+    println!("Usage: aavajan [--plain] [--frames COUNT]");
+    println!("  --plain         print a plain formed snapshot");
     println!("  --frames COUNT  stop after COUNT rendered frames");
     println!("  -h, --help      show this help");
 }
@@ -205,7 +245,7 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
     for particle in particles {
         particle.previous = particle.position;
         let energy;
-        let radius = 1;
+        let mut radius = 1;
 
         if cycle < FORM_END {
             let progress = ease(cycle / FORM_END);
@@ -222,6 +262,7 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
             particle.position.y = particle.target.y
                 + (local * 2.1 + particle.phase * 1.4).cos() * 0.008 * particle.drift;
             energy = 0.9;
+            radius = 0;
         } else if cycle < DISSOLVE_END {
             let progress = ease((cycle - HOLD_END) / (DISSOLVE_END - HOLD_END));
             let direction_x = particle.target.x - 0.5;
@@ -253,7 +294,7 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
             radius,
         );
         if (FORM_END..HOLD_END).contains(&cycle) {
-            framebuffer.plot_normalized(particle.position.x, particle.position.y, GOLD, 0.65, 1);
+            framebuffer.plot_normalized(particle.position.x, particle.position.y, GOLD, 0.65, 0);
         }
     }
 }

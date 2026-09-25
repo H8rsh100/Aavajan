@@ -37,6 +37,12 @@ cargo run --release -- --frames 720
 
 At 60 frames per second, 720 frames gives one complete animation cycle. The renderer automatically caps the terminal dimensions to a comfortable range and defaults to an 80x24-sized presentation when the terminal reports its size.
 
+For a plain formed snapshot without terminal control codes:
+
+```text
+cargo run --release -- --plain
+```
+
 ## How it works
 
 - `src/braille.rs` accumulates colored light in a 2x4 sub-pixel grid, applies ordered dithering, and emits Unicode Braille plus ANSI truecolor escape sequences.
