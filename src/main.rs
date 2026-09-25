@@ -10,12 +10,12 @@ mod shape;
 
 use braille::{Framebuffer, Rgb};
 
-const CYCLE_SECONDS: f32 = 12.0;
 const FORM_END: f32 = 4.0;
-const HOLD_DURATION: f32 = 3.5;
+const HOLD_DURATION: f32 = 5.0;
 const DISSOLVE_DURATION: f32 = 2.0;
 const HOLD_END: f32 = FORM_END + HOLD_DURATION;
 const DISSOLVE_END: f32 = HOLD_END + DISSOLVE_DURATION;
+const CYCLE_SECONDS: f32 = DISSOLVE_END;
 const TAU: f32 = std::f32::consts::PI * 2.0;
 const DEFAULT_SEED: u32 = 0x0A17_AA93;
 
@@ -118,7 +118,7 @@ fn run_plain(frame_limit: Option<u32>, seed: u32) -> io::Result<()> {
     let start = if frame_limit.is_some() {
         0.0
     } else {
-        HOLD_END + 0.5
+        FORM_END + HOLD_DURATION * 0.5
     };
     if frame_limit.is_none() {
         for particle in &mut particles {
@@ -315,14 +315,15 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
                 + (local * 2.1 + particle.phase * 1.4).cos() * 0.008 * particle.drift;
             energy = 0.9;
             radius = 0;
-        } else if cycle < DISSOLVE_END {
-            let progress = ease((cycle - HOLD_END) / (DISSOLVE_END - HOLD_END));
+        } else {
+            let progress = ease((cycle - HOLD_END) / DISSOLVE_DURATION);
+            let burst = ((progress - 0.65) / 0.35).clamp(0.0, 1.0);
             let direction_x = particle.target.x - 0.5;
             let direction_y = particle.target.y - 0.48;
             let length = (direction_x * direction_x + direction_y * direction_y)
                 .sqrt()
                 .max(0.001);
-            let distance = 0.08 + progress * 0.95;
+            let distance = 0.08 + progress * (1.1 + burst * 0.8);
             let swirl = (progress * std::f32::consts::PI + particle.phase).sin() * 0.12;
             particle.position.x =
                 particle.target.x + direction_x / length * distance - direction_y / length * swirl;
@@ -330,12 +331,8 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
                 + direction_y / length * distance
                 + direction_x / length * swirl
                 + (progress * 8.0 + particle.phase).sin() * 0.025;
-            energy = 0.9 * (1.0 - progress * 0.72);
-        } else {
-            let progress = (cycle - DISSOLVE_END) / (CYCLE_SECONDS - DISSOLVE_END);
-            particle.position.x = particle.target.x + direction(particle).0 * progress * 1.4;
-            particle.position.y = particle.target.y + direction(particle).1 * progress * 1.4;
-            energy = 0.2 * (1.0 - progress);
+            energy = 0.9 * (1.0 - progress * 0.35) + burst * 0.4;
+            radius = if burst > 0.5 { 1 } else { 0 };
         }
 
         framebuffer.segment_normalized(
@@ -349,13 +346,6 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
             framebuffer.plot_normalized(particle.position.x, particle.position.y, GOLD, 0.65, 0);
         }
     }
-}
-
-fn direction(particle: &Particle) -> (f32, f32) {
-    let x = particle.target.x - 0.5;
-    let y = particle.target.y - 0.48;
-    let length = (x * x + y * y).sqrt().max(0.001);
-    (x / length, y / length)
 }
 
 fn random(seed: &mut u32) -> f32 {
@@ -378,8 +368,8 @@ mod tests {
 
     #[test]
     fn phase_timing_matches_the_animation_contract() {
-        assert_eq!(HOLD_END - FORM_END, 3.5);
+        assert_eq!(HOLD_END - FORM_END, 5.0);
         assert_eq!(DISSOLVE_END - HOLD_END, 2.0);
-        assert_eq!(CYCLE_SECONDS - DISSOLVE_END, 2.5);
+        assert_eq!(CYCLE_SECONDS, DISSOLVE_END);
     }
 }

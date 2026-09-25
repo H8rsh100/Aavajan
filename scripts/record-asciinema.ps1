@@ -1,6 +1,6 @@
 param(
     [ValidateRange(1, 100000)]
-    [int]$Frames = 720,
+    [int]$Frames = 660,
     [string]$Seed = "1337",
     [string]$Output = "aavajan.cast"
 )

@@ -4,7 +4,7 @@ All notable changes to Aavajan are documented here.
 
 ## [Unreleased]
 
-- No planned changes yet.
+- Tightened the loop to a four-second formation, five-second hold, and two-second dissolve with an immediate outward burst and no reset tail.
 
 ## [0.1.0] - 2026-09-25
 
