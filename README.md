@@ -43,6 +43,14 @@ For a plain formed snapshot without terminal control codes:
 cargo run --release -- --plain
 ```
 
+For reproducible recordings, provide any unsigned 32-bit seed. The default seed is used when this option is omitted.
+
+```text
+cargo run --release -- --frames 720 --seed 1337
+```
+
+Use `cargo run --release -- --version` to print the package version.
+
 ## How it works
 
 - `src/braille.rs` accumulates colored light in a 2x4 sub-pixel grid, applies ordered dithering, and emits Unicode Braille plus ANSI truecolor escape sequences.

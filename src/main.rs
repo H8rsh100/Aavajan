@@ -15,6 +15,7 @@ const FORM_END: f32 = 4.0;
 const HOLD_END: f32 = 7.0;
 const DISSOLVE_END: f32 = 11.5;
 const TAU: f32 = std::f32::consts::PI * 2.0;
+const DEFAULT_SEED: u32 = 0x0A17_AA93;
 
 const SAFFRON: Rgb = Rgb::new(1.0, 0.42, 0.06);
 const GOLD: Rgb = Rgb::new(1.0, 0.78, 0.18);
@@ -39,7 +40,9 @@ struct Particle {
 
 struct Options {
     frame_limit: Option<u32>,
+    seed: u32,
     plain: bool,
+    version: bool,
     help: bool,
 }
 
@@ -55,10 +58,14 @@ fn main() {
         print_help();
         return;
     }
+    if options.version {
+        println!("aavajan {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
     let result = if options.plain {
-        run_plain(options.frame_limit)
+        run_plain(options.frame_limit, options.seed)
     } else {
-        run(options.frame_limit)
+        run(options.frame_limit, options.seed)
     };
     if let Err(error) = result {
         eprintln!("aavajan: {error}");
@@ -66,7 +73,7 @@ fn main() {
     }
 }
 
-fn run(frame_limit: Option<u32>) -> io::Result<()> {
+fn run(frame_limit: Option<u32>, seed: u32) -> io::Result<()> {
     terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(
@@ -78,7 +85,7 @@ fn run(frame_limit: Option<u32>) -> io::Result<()> {
 
     let (columns, rows) = terminal::size().unwrap_or((80, 24));
     let mut framebuffer = Framebuffer::new(columns.clamp(40, 160), rows.clamp(12, 60));
-    let mut particles = create_particles();
+    let mut particles = create_particles(seed);
     let started = Instant::now();
     let result = run_loop(
         &mut stdout,
@@ -98,10 +105,10 @@ fn run(frame_limit: Option<u32>) -> io::Result<()> {
     result
 }
 
-fn run_plain(frame_limit: Option<u32>) -> io::Result<()> {
+fn run_plain(frame_limit: Option<u32>, seed: u32) -> io::Result<()> {
     let (columns, rows) = terminal::size().unwrap_or((80, 24));
     let mut framebuffer = Framebuffer::new(columns.clamp(40, 160), rows.clamp(12, 60));
-    let mut particles = create_particles();
+    let mut particles = create_particles(seed);
     let frame_count = frame_limit.unwrap_or(1);
     let start = if frame_limit.is_some() {
         0.0
@@ -175,14 +182,25 @@ fn run_loop<W: Write>(
 fn parse_options() -> Result<Options, String> {
     let mut options = Options {
         frame_limit: None,
+        seed: DEFAULT_SEED,
         plain: false,
+        version: false,
         help: false,
     };
     let mut arguments = std::env::args().skip(1);
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
             "--help" | "-h" => options.help = true,
+            "--version" | "-V" => options.version = true,
             "--plain" => options.plain = true,
+            "--seed" => {
+                let value = arguments
+                    .next()
+                    .ok_or_else(|| "--seed needs an unsigned integer".to_string())?;
+                options.seed = value
+                    .parse::<u32>()
+                    .map_err(|_| "--seed needs an unsigned integer".to_string())?;
+            }
             "--frames" => {
                 let value = arguments
                     .next()
@@ -203,15 +221,17 @@ fn parse_options() -> Result<Options, String> {
 
 fn print_help() {
     println!("Aavajan - Ganesha Particle Renderer");
-    println!("Usage: aavajan [--plain] [--frames COUNT]");
+    println!("Usage: aavajan [--plain] [--frames COUNT] [--seed VALUE]");
     println!("  --plain         print a plain formed snapshot");
     println!("  --frames COUNT  stop after COUNT rendered frames");
+    println!("  --seed VALUE    use a deterministic particle seed");
+    println!("  -V, --version   show the package version");
     println!("  -h, --help      show this help");
 }
 
-fn create_particles() -> Vec<Particle> {
+fn create_particles(seed: u32) -> Vec<Particle> {
     let targets = shape::targets();
-    let mut seed = 0x0A17_AA93_u32;
+    let mut seed = seed;
     let mut particles = Vec::with_capacity(targets.len());
     for target in targets {
         let angle = random(&mut seed) * TAU;
