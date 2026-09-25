@@ -23,7 +23,7 @@ pub fn targets() -> Vec<Target> {
         }
     }
 
-    let step = (cells.len() / MAX_TARGETS).max(1);
+    let step = cells.len().div_ceil(MAX_TARGETS).max(1);
     cells
         .into_iter()
         .step_by(step)
@@ -33,4 +33,30 @@ pub fn targets() -> Vec<Target> {
             target
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn target_points_are_bounded_and_limited() {
+        let points = targets();
+        assert!(!points.is_empty());
+        assert!(points.len() <= MAX_TARGETS);
+        assert!(
+            points
+                .iter()
+                .all(|point| { (0.0..=1.0).contains(&point.x) && (0.0..=1.0).contains(&point.y) })
+        );
+    }
+
+    #[test]
+    fn target_points_span_the_artwork() {
+        let points = targets();
+        assert!(points.iter().any(|point| point.y < 0.4));
+        assert!(points.iter().any(|point| point.y > 0.6));
+        assert!(points.iter().any(|point| point.x < 0.4));
+        assert!(points.iter().any(|point| point.x > 0.6));
+    }
 }

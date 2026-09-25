@@ -169,3 +169,35 @@ impl Framebuffer {
         output
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn contains_braille(frame: &str) -> bool {
+        frame
+            .chars()
+            .any(|character| ('\u{2800}'..='\u{28ff}').contains(&character))
+    }
+
+    #[test]
+    fn plot_emits_truecolor_braille() {
+        let mut framebuffer = Framebuffer::new(2, 1);
+        framebuffer.plot_normalized(0.25, 0.5, Rgb::new(1.0, 0.2, 0.0), 1.0, 0);
+
+        let frame = framebuffer.frame();
+        assert!(contains_braille(&frame));
+        assert!(frame.contains("\x1b[38;2;"));
+    }
+
+    #[test]
+    fn clear_removes_previous_pixels() {
+        let mut framebuffer = Framebuffer::new(2, 1);
+        framebuffer.plot_normalized(0.25, 0.5, GOLD, 1.0, 0);
+        framebuffer.clear();
+
+        assert!(!contains_braille(&framebuffer.frame()));
+    }
+
+    const GOLD: Rgb = Rgb::new(1.0, 0.78, 0.18);
+}
