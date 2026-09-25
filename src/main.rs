@@ -138,14 +138,21 @@ fn run_loop<W: Write>(
 ) -> io::Result<()> {
     let mut frame = 0u32;
     loop {
-        if event::poll(Duration::from_millis(0))?
-            && let Event::Key(key) = event::read()?
-            && (key.code == KeyCode::Esc
-                || key.code == KeyCode::Char('q')
-                || (key.code == KeyCode::Char('c')
-                    && key.modifiers.contains(KeyModifiers::CONTROL)))
-        {
-            return Ok(());
+        if event::poll(Duration::from_millis(0))? {
+            match event::read()? {
+                Event::Key(key)
+                    if key.code == KeyCode::Esc
+                        || key.code == KeyCode::Char('q')
+                        || (key.code == KeyCode::Char('c')
+                            && key.modifiers.contains(KeyModifiers::CONTROL)) =>
+                {
+                    return Ok(());
+                }
+                Event::Resize(columns, rows) => {
+                    framebuffer.resize(columns.clamp(40, 160), rows.clamp(12, 60));
+                }
+                _ => {}
+            }
         }
 
         let frame_started = Instant::now();

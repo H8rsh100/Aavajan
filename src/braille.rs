@@ -60,6 +60,19 @@ impl Framebuffer {
         }
     }
 
+    pub fn resize(&mut self, cols: u16, rows: u16) {
+        let cols = cols.max(1);
+        let rows = rows.max(1);
+        if cols == self.cols && rows == self.rows {
+            return;
+        }
+        self.cols = cols;
+        self.rows = rows;
+        self.width = cols as usize * 2;
+        self.height = rows as usize * 4;
+        self.pixels = vec![Pixel::default(); self.width * self.height];
+    }
+
     pub fn clear(&mut self) {
         self.pixels.fill(Pixel::default());
     }
@@ -221,6 +234,18 @@ mod tests {
         let frame = framebuffer.plain_frame();
         assert!(contains_braille(&frame));
         assert!(!frame.contains("\x1b"));
+    }
+
+    #[test]
+    fn resize_rebuilds_the_surface() {
+        let mut framebuffer = Framebuffer::new(2, 1);
+        framebuffer.resize(3, 2);
+        framebuffer.plot_normalized(0.5, 0.5, GOLD, 1.0, 0);
+
+        let frame = framebuffer.plain_frame();
+        assert_eq!(frame.lines().count(), 2);
+        assert!(frame.lines().all(|line| line.chars().count() == 3));
+        assert!(contains_braille(&frame));
     }
 
     #[test]
