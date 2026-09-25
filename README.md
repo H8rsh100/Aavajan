@@ -51,6 +51,12 @@ cargo run --release -- --frames 720 --seed 1337
 
 Use `cargo run --release -- --version` to print the package version.
 
+To measure the renderer without writing terminal frames:
+
+```text
+cargo run --release -- --benchmark --frames 600
+```
+
 ## How it works
 
 - `src/braille.rs` accumulates colored light in a 2x4 sub-pixel grid, applies ordered dithering, and emits Unicode Braille plus ANSI truecolor escape sequences.

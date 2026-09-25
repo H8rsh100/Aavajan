@@ -42,6 +42,7 @@ struct Options {
     frame_limit: Option<u32>,
     seed: u32,
     plain: bool,
+    benchmark: bool,
     version: bool,
     help: bool,
 }
@@ -62,7 +63,9 @@ fn main() {
         println!("aavajan {}", env!("CARGO_PKG_VERSION"));
         return;
     }
-    let result = if options.plain {
+    let result = if options.benchmark {
+        run_benchmark(options.frame_limit.unwrap_or(600), options.seed)
+    } else if options.plain {
         run_plain(options.frame_limit, options.seed)
     } else {
         run(options.frame_limit, options.seed)
@@ -136,6 +139,23 @@ fn run_plain(frame_limit: Option<u32>, seed: u32) -> io::Result<()> {
     Ok(())
 }
 
+fn run_benchmark(frame_count: u32, seed: u32) -> io::Result<()> {
+    let (columns, rows) = terminal::size().unwrap_or((80, 24));
+    let mut framebuffer = Framebuffer::new(columns.clamp(40, 160), rows.clamp(12, 60));
+    let mut particles = create_particles(seed);
+    let started = Instant::now();
+    for frame in 0..frame_count {
+        render(&mut framebuffer, &mut particles, frame as f32 / 60.0);
+        std::hint::black_box(framebuffer.plain_frame());
+    }
+    let elapsed = started.elapsed().as_secs_f32().max(0.001);
+    println!(
+        "benchmark: {frame_count} frames in {elapsed:.2}s ({:.1} fps)",
+        frame_count as f32 / elapsed
+    );
+    Ok(())
+}
+
 fn run_loop<W: Write>(
     output: &mut W,
     framebuffer: &mut Framebuffer,
@@ -184,6 +204,7 @@ fn parse_options() -> Result<Options, String> {
         frame_limit: None,
         seed: DEFAULT_SEED,
         plain: false,
+        benchmark: false,
         version: false,
         help: false,
     };
@@ -193,6 +214,7 @@ fn parse_options() -> Result<Options, String> {
             "--help" | "-h" => options.help = true,
             "--version" | "-V" => options.version = true,
             "--plain" => options.plain = true,
+            "--benchmark" => options.benchmark = true,
             "--seed" => {
                 let value = arguments
                     .next()
@@ -221,8 +243,9 @@ fn parse_options() -> Result<Options, String> {
 
 fn print_help() {
     println!("Aavajan - Ganesha Particle Renderer");
-    println!("Usage: aavajan [--plain] [--frames COUNT] [--seed VALUE]");
+    println!("Usage: aavajan [--plain|--benchmark] [--frames COUNT] [--seed VALUE]");
     println!("  --plain         print a plain formed snapshot");
+    println!("  --benchmark     measure render throughput without output");
     println!("  --frames COUNT  stop after COUNT rendered frames");
     println!("  --seed VALUE    use a deterministic particle seed");
     println!("  -V, --version   show the package version");
