@@ -11,7 +11,7 @@ mod shape;
 use braille::{Framebuffer, Rgb};
 
 const FORM_END: f32 = 4.0;
-const HOLD_DURATION: f32 = 3.0;
+const HOLD_DURATION: f32 = 2.5;
 const DISSOLVE_DURATION: f32 = 2.0;
 const HOLD_END: f32 = FORM_END + HOLD_DURATION;
 const DISSOLVE_END: f32 = HOLD_END + DISSOLVE_DURATION;
@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     fn phase_timing_matches_the_animation_contract() {
-        assert_eq!(HOLD_END - FORM_END, 3.0);
+        assert_eq!(HOLD_END - FORM_END, 2.5);
         assert_eq!(DISSOLVE_END - HOLD_END, 2.0);
         assert_eq!(CYCLE_SECONDS, DISSOLVE_END);
     }
@@ -402,7 +402,7 @@ mod tests {
         render(
             &mut framebuffer,
             std::slice::from_mut(&mut particle),
-            FORM_END + 2.5,
+            FORM_END + 2.0,
         );
 
         assert_eq!(first_hold_position.x, target.x);
