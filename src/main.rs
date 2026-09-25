@@ -314,8 +314,8 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
                 particle.previous = particle.target;
             }
             let pulse = (0.5 + 0.5 * (local * 1.6 + particle.phase).sin()) * particle.drift;
-            energy = 0.78 + pulse * 0.14;
-            radius = 0;
+            energy = 0.82 + pulse * 0.16;
+            radius = 1;
         } else {
             let progress = ease((cycle - HOLD_END) / DISSOLVE_DURATION);
             let burst = ((progress - 0.65) / 0.35).clamp(0.0, 1.0);
@@ -405,5 +405,34 @@ mod tests {
         assert_eq!(first_hold_position.y, target.y);
         assert_eq!(particle.position.x, target.x);
         assert_eq!(particle.position.y, target.y);
+    }
+
+    #[test]
+    fn hold_keeps_a_visible_particle_glow() {
+        let mut framebuffer = Framebuffer::new(10, 5);
+        let start = Point { x: 0.1, y: 0.2 };
+        let target = Point { x: 0.5, y: 0.5 };
+        let mut particle = Particle {
+            start,
+            target,
+            position: start,
+            previous: start,
+            color: GOLD,
+            phase: 1.2,
+            drift: 0.8,
+        };
+
+        render(
+            &mut framebuffer,
+            std::slice::from_mut(&mut particle),
+            FORM_END + 0.5,
+        );
+        let marked_cells = framebuffer
+            .plain_frame()
+            .chars()
+            .filter(|character| *character != ' ' && *character != '\n')
+            .count();
+
+        assert!(marked_cells >= 5);
     }
 }
