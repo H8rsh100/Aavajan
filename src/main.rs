@@ -309,11 +309,12 @@ fn render(framebuffer: &mut Framebuffer, particles: &mut [Particle], elapsed: f3
             energy = 0.35 + progress * 0.55;
         } else if cycle < HOLD_END {
             let local = cycle - FORM_END;
-            particle.position.x =
-                particle.target.x + (local * 1.7 + particle.phase).sin() * 0.006 * particle.drift;
-            particle.position.y = particle.target.y
-                + (local * 2.1 + particle.phase * 1.4).cos() * 0.008 * particle.drift;
-            energy = 0.9;
+            particle.position = particle.target;
+            if local < 0.05 {
+                particle.previous = particle.target;
+            }
+            let pulse = (0.5 + 0.5 * (local * 1.6 + particle.phase).sin()) * particle.drift;
+            energy = 0.78 + pulse * 0.14;
             radius = 0;
         } else {
             let progress = ease((cycle - HOLD_END) / DISSOLVE_DURATION);
@@ -371,5 +372,38 @@ mod tests {
         assert_eq!(HOLD_END - FORM_END, 5.0);
         assert_eq!(DISSOLVE_END - HOLD_END, 2.0);
         assert_eq!(CYCLE_SECONDS, DISSOLVE_END);
+    }
+
+    #[test]
+    fn hold_locks_particles_to_their_targets() {
+        let mut framebuffer = Framebuffer::new(10, 5);
+        let start = Point { x: 0.1, y: 0.2 };
+        let target = Point { x: 0.7, y: 0.8 };
+        let mut particle = Particle {
+            start,
+            target,
+            position: start,
+            previous: start,
+            color: GOLD,
+            phase: 1.2,
+            drift: 0.8,
+        };
+
+        render(
+            &mut framebuffer,
+            std::slice::from_mut(&mut particle),
+            FORM_END + 0.5,
+        );
+        let first_hold_position = particle.position;
+        render(
+            &mut framebuffer,
+            std::slice::from_mut(&mut particle),
+            FORM_END + 3.5,
+        );
+
+        assert_eq!(first_hold_position.x, target.x);
+        assert_eq!(first_hold_position.y, target.y);
+        assert_eq!(particle.position.x, target.x);
+        assert_eq!(particle.position.y, target.y);
     }
 }

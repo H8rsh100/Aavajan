@@ -5,6 +5,7 @@ All notable changes to Aavajan are documented here.
 ## [Unreleased]
 
 - Tightened the loop to a four-second formation, five-second hold, and two-second dissolve with an immediate outward burst and no reset tail.
+- Locked formed particles to their artwork targets during the hold so the silhouette stays readable before the burst.
 
 ## [0.1.0] - 2026-09-25
 
